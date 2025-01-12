@@ -4,16 +4,7 @@ use std::env::var;
 
 struct FakeData {
     _id: i32,
-    col1: String,
-    col2: String,
-    col3: String,
-    col4: String,
-    col5: String,
-    col6: String,
-    col7: String,
-    col8: String,
-    col9: String,
-    col10: String,
+    cols: Vec<String>,
 }
 
 fn main() -> Result<(), XlsxError> {
@@ -30,18 +21,12 @@ fn main() -> Result<(), XlsxError> {
         let result = client.query("SELECT * FROM test_table", &[])?;
         Ok(result
             .iter()
-            .map(|row| FakeData {
-                _id: row.get(0),
-                col1: row.get(1),
-                col2: row.get(2),
-                col3: row.get(3),
-                col4: row.get(4),
-                col5: row.get(5),
-                col6: row.get(6),
-                col7: row.get(7),
-                col8: row.get(8),
-                col9: row.get(9),
-                col10: row.get(10),
+            .map(|row| {
+                let _id: i32 = row.get(0);
+                let cols: Vec<String> = (1..row.len())
+                    .map(|i| row.get::<_, Option<String>>(i).unwrap_or_default())
+                    .collect();
+                FakeData { _id, cols }
             })
             .collect())
     }
@@ -62,32 +47,17 @@ fn main() -> Result<(), XlsxError> {
     // Add a worksheet to the workbook.
     let worksheet = workbook.add_worksheet();
 
-    let _ = worksheet.write_row(
-        0,
-        0,
-        [
-            "_id", "col1", "col2", "col3", "col4", "col5", "col6", "col7", "col8", "col9", "col10",
-        ],
-    );
-    for row in rows {
-        // Write to excel
-        let _ = worksheet.write_row(
-            row._id as u32,
-            0,
-            [
-                row._id.to_string(),
-                row.col1,
-                row.col2,
-                row.col3,
-                row.col4,
-                row.col5,
-                row.col6,
-                row.col7,
-                row.col8,
-                row.col9,
-                row.col10,
-            ],
-        );
+    // Write the header row.
+    let header = [
+        "_id", "col1", "col2", "col3", "col4", "col5", "col6", "col7", "col8", "col9", "col10",
+    ];
+    worksheet.write_row(0, 0, header)?;
+
+    // Write data rows.
+    for (i, row) in rows.iter().enumerate() {
+        let mut data = vec![row._id.to_string()];
+        data.extend(row.cols.clone());
+        worksheet.write_row(i as u32 + 1, 0, data)?;
     }
 
     // Save the file to disk.
