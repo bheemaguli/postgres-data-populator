@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 postgres = "0.19.9"
 postgres-types = "0.2.8"
-rust_xlsxwriter = "0.80.0"
+rust_xlsxwriter = { version = "0.80.0", features = ["zlib", "ryu"] }
