@@ -1,5 +1,5 @@
-use postgres::{Client, Error, NoTls};
-use rust_xlsxwriter::{Workbook, XlsxError};
+use postgres::{Client, Error, NoTls, Transaction};
+use rust_xlsxwriter::{Workbook};
 use std::env::var;
 
 struct FakeData {
@@ -7,40 +7,42 @@ struct FakeData {
     cols: Vec<String>,
 }
 
-fn main() -> Result<(), XlsxError> {
-    fn get_rows() -> Result<Vec<FakeData>, Error> {
-        let db_host = var("DB_HOST").unwrap_or("localhost".to_string());
-        let db_name = var("DB_NAME").unwrap_or("test_db".to_string());
-        let db_user = var("DB_USER").unwrap_or("user".to_string());
-        let db_pass = var("DB_PASS").unwrap_or("password".to_string());
+fn setup_db_connection() -> Result<Client, Error> {
+    let db_host = var("DB_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let db_name = var("DB_NAME").unwrap_or_else(|_| "test_db".to_string());
+    let db_user = var("DB_USER").unwrap_or_else(|_| "user".to_string());
+    let db_pass = var("DB_PASS").unwrap_or_else(|_| "password".to_string());
 
-        let mut client = Client::connect(
-            &format!("postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"),
-            NoTls,
-        )?;
-        let result = client.query("SELECT * FROM test_table", &[])?;
-        Ok(result
-            .iter()
-            .map(|row| {
-                let _id: i32 = row.get(0);
-                let cols: Vec<String> = (1..row.len())
-                    .map(|i| row.get::<_, Option<String>>(i).unwrap_or_default())
-                    .collect();
-                FakeData { _id, cols }
-            })
-            .collect())
-    }
+    Client::connect(
+        &format!("postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"),
+        NoTls,
+    )
+}
 
-    let rows = match get_rows() {
-        Ok(rows) => rows,
-        Err(err) => {
-            eprintln!("Error fetching rows: {}", err);
-            return Err(XlsxError::from(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Error fetching rows",
-            )));
-        }
-    };
+fn fetch_chunk(transaction: &mut Transaction, chunk_size: usize) -> Result<Vec<FakeData>, Error> {
+    let rows = transaction.query(&format!("FETCH {} FROM data_cursor", chunk_size), &[])?;
+
+    Ok(rows
+        .iter()
+        .map(|row| FakeData {
+            _id: row.get(0),
+            cols: (1..row.len())
+                .map(|i| row.get::<_, Option<String>>(i).unwrap_or_default())
+                .collect(),
+        })
+        .collect())
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    const CHUNK_SIZE: usize = 1000;
+
+    // Set up the database connection and cursor
+    let mut client = setup_db_connection()?;
+    let mut transaction = client.transaction()?;
+    transaction.execute(
+        "DECLARE data_cursor CURSOR FOR SELECT * FROM test_table ORDER BY id",
+        &[],
+    )?;
 
     // Create a new Excel file object.
     let mut workbook = Workbook::new();
@@ -53,12 +55,25 @@ fn main() -> Result<(), XlsxError> {
     ];
     worksheet.write_row(0, 0, header)?;
 
-    // Write data rows.
-    for (i, row) in rows.iter().enumerate() {
-        let mut data = vec![row._id.to_string()];
-        data.extend(row.cols.clone());
-        worksheet.write_row(i as u32 + 1, 0, data)?;
+    let mut row_index = 1; // Start writing data from the second row
+    loop {
+        let rows = fetch_chunk(&mut transaction, CHUNK_SIZE)?;
+        if rows.is_empty() {
+            break;
+        }
+
+        // Write the chunk to Excel
+        for row in rows {
+            let mut data: Vec<String> = vec![row._id.to_string()];
+            data.extend(row.cols);
+            worksheet.write_row(row_index, 0, data)?;
+            row_index += 1;
+        }
     }
+
+    // Close the cursor and commit the transaction
+    transaction.execute("CLOSE data_cursor", &[])?;
+    transaction.commit()?;
 
     // Save the file to disk.
     workbook.save("hello.xlsx")?;

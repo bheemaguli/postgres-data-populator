@@ -41,3 +41,31 @@ Average:
 
 Average:
 26.335
+
+#### Rerun when I'm not watching youtube 
+- cargo run --release  26.40s user 1.20s system 96% cpu 28.724 total
+- cargo run --release  25.82s user 1.20s system 95% cpu 28.194 total
+- cargo run --release  26.24s user 1.23s system 95% cpu 28.727 total
+- cargo run --release  25.78s user 1.28s system 94% cpu 28.527 total
+- cargo run --release  26.00s user 1.16s system 96% cpu 28.150 total
+- cargo run --release  25.84s user 1.27s system 94% cpu 28.563 total
+- cargo run --release  26.04s user 1.22s system 95% cpu 28.623 total
+- cargo run --release  25.93s user 1.17s system 95% cpu 28.500 total
+- cargo run --release  25.82s user 1.17s system 94% cpu 28.417 total
+
+Average:
+25.985
+
+## Stats for rust_xlswriter with zlib, with db cursors for streaming results
+- cargo run --release  25.90s user 1.23s system 94% cpu 28.612 total
+- cargo run --release  26.76s user 1.24s system 95% cpu 29.349 total
+- cargo run --release  25.86s user 1.20s system 94% cpu 28.504 total
+- cargo run --release  25.97s user 1.19s system 95% cpu 28.488 total
+- cargo run --release  25.82s user 1.23s system 95% cpu 28.386 total
+- cargo run --release  25.93s user 1.16s system 94% cpu 28.784 total
+- cargo run --release  25.68s user 1.18s system 95% cpu 28.181 total
+- cargo run --release  26.20s user 1.14s system 95% cpu 28.641 total
+- cargo run --release  25.78s user 1.17s system 94% cpu 28.427 total
+
+Average:
+25.988
